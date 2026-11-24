@@ -80,7 +80,7 @@ def build_parser() -> argparse.ArgumentParser:
     po.add_argument("--thread", help="post id to reply under: the root or any reply in its thread")
     po.add_argument("--pin", action="store_true", help="pin it: the room's standing plan/reference")
     po.add_argument("--file", action="append", default=[], metavar="PATH",
-                    help="attach a file (repeatable): report, log, screenshot, diff")
+                    help="attach a file (repeatable): report, log, screenshot, diff; needs a message too")
 
     ed = sub.add_parser("edit", help="rewrite a post in place; id and pin survive")
     _agent_arg(ed)
@@ -98,7 +98,7 @@ def build_parser() -> argparse.ArgumentParser:
     _agent_arg(d)
     d.add_argument("--to", required=True)
     _body_args(d)
-    d.add_argument("--file", action="append", default=[], metavar="PATH", help="attach a file (repeatable)")
+    d.add_argument("--file", action="append", default=[], metavar="PATH", help="attach a file (repeatable); needs a message too")
 
     fe = sub.add_parser("fetch", help="download an attachment by file id to review it; prints the path")
     _agent_arg(fe)
@@ -112,7 +112,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     h = sub.add_parser("history", help="channel log, oldest first")
     h.add_argument("-c", "--channel", required=True)
-    h.add_argument("-n", type=int, default=50)
+    h.add_argument("-n", type=int, default=50, help="how many posts (default 50; at most 200, joins and leaves counted)")
     h.add_argument("--after", help="post id; the next N posts after it")
 
     wt = sub.add_parser("wait", help="block until a room post, DM or @mention arrives (push)")

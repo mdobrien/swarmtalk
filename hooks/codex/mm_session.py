@@ -75,6 +75,67 @@ def write_state(path, data):
             os.unlink(temp_name)
 
 
+def process_identity(pid):
+    """pid plus start time, so a reused pid is not mistaken for the same process."""
+    started = subprocess.run(
+        ["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True, timeout=5
+    ).stdout.strip()
+    return {"pid": pid, "started": started} if started else None
+
+
+def codex_owner():
+    """The nearest Codex process above this hook, or None if it cannot be found."""
+    pid = os.getppid()
+    try:
+        for _ in range(10):
+            fields = subprocess.run(
+                ["ps", "-o", "ppid=,comm=", "-p", str(pid)], capture_output=True, text=True, timeout=5
+            ).stdout.split(None, 1)
+            if len(fields) < 2:
+                return None
+            if "codex" in os.path.basename(fields[1].strip()):
+                return process_identity(pid)
+            pid = int(fields[0])
+            if pid <= 1:
+                return None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+    return None
+
+
+def owner_alive(owner):
+    """False only when the recorded Codex process is certainly gone."""
+    if not owner:
+        return True
+    try:
+        return process_identity(owner["pid"]) == owner
+    except (OSError, subprocess.SubprocessError):
+        return True
+
+
+def split_messages(output):
+    """One string per message in `mm wait` output, later body lines included."""
+    messages = []
+    for line in output.splitlines():
+        if re.match(r"\[[a-z0-9]{26}\] @", line):
+            messages.append(line)
+        elif messages:
+            messages[-1] += "\n" + line
+    return [message.rstrip() for message in messages]
+
+
+class ChangeLog:
+    """Log to stderr, skipping repeats: a stopped server must not fill the log."""
+
+    def __init__(self):
+        self.last = None
+
+    def write(self, text):
+        if text != self.last:
+            print(text, file=sys.stderr, flush=True)
+            self.last = text
+
+
 def hook_context(name, resumed, inbox):
     status = "resumed" if resumed else "new"
     context = (
@@ -117,7 +178,9 @@ def start(hook, path):
         )
         if not re.fullmatch(r"[a-z][a-z0-9_-]*", name):
             raise RuntimeError("`mm agent new` returned an invalid account name")
-        write_state(path, {"agent": name, "cwd": cwd, "retired": False})
+        data = {"agent": name, "cwd": cwd, "retired": False}
+    data["owner"] = codex_owner()
+    write_state(path, data)
     try:
         inbox = run_mm("inbox", "-a", name, timeout=10)
     except (OSError, subprocess.SubprocessError):
@@ -126,16 +189,25 @@ def start(hook, path):
     print(json.dumps(hook_context(name, resumed, inbox)))
 
 
-def end(hook, path):
+def end(hook, path, timeout=2):
     data = read_state(path)
     name = data.get("agent")
     if not name or data.get("retired"):
         return
     if active_account(name):
         summary = "Codex session ended in " + str(data.get("cwd") or hook.get("cwd") or "workspace")
-        run_mm("agent", "retire", "-a", name, "--summary", summary, timeout=2)
+        run_mm("agent", "retire", "-a", name, "--summary", summary, timeout=timeout)
     data["retired"] = True
     write_state(path, data)
+
+
+def end_if_abandoned(path):
+    """Retire the account of a session whose Codex process died without a SessionEnd."""
+    with (STATE_DIR / (path.stem + ".lock")).open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if owner_alive(read_state(path).get("owner")):  # resumed meanwhile
+            return
+        end({}, path, timeout=15)
 
 
 def listen(session_id, path):
@@ -148,12 +220,20 @@ def listen(session_id, path):
         pid_path = STATE_DIR / (path.stem + ".listener.pid")
         pid_path.write_text(str(os.getpid()) + "\n")
         pending_path = STATE_DIR / (path.stem + ".pending.json")
+        log = ChangeLog()
         try:
             while True:
                 data = read_state(path)
                 name = data.get("agent")
                 if not name or data.get("retired") or not active_account(name):
                     return
+                if not owner_alive(data.get("owner")):
+                    try:
+                        end_if_abandoned(path)
+                    except (OSError, subprocess.SubprocessError) as error:
+                        log.write("Retiring an abandoned session failed: " + str(error))
+                        time.sleep(5)
+                    continue
                 pending = read_state(pending_path)
                 if not isinstance(pending, list):
                     pending = []
@@ -171,7 +251,7 @@ def listen(session_id, path):
                             capture_output=True, text=True, timeout=15, check=True,
                         )
                     except (OSError, subprocess.SubprocessError) as error:
-                        print("Codex queue failed: " + str(error), file=sys.stderr, flush=True)
+                        log.write("Codex queue failed: " + str(error))
                         time.sleep(5)
                         continue
                     write_state(pending_path, pending[1:])
@@ -181,10 +261,10 @@ def listen(session_id, path):
                     # queue one interrupt per post. Room chatter is read via `mm inbox` instead.
                     output = run_mm("wait", "-a", name, "--timeout", "30", "--mentions-only", timeout=40)
                 except (OSError, subprocess.SubprocessError) as error:
-                    print("Mattermost wait failed: " + str(error), file=sys.stderr, flush=True)
+                    log.write("Mattermost wait failed: " + str(error))
                     time.sleep(5)
                     continue
-                messages = [line for line in output.splitlines() if line.startswith("[")]
+                messages = split_messages(output)
                 if messages:
                     message_dir = STATE_DIR / (path.stem + ".messages")
                     message_dir.mkdir(mode=0o700, exist_ok=True)

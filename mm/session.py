@@ -7,6 +7,7 @@ server is down, so a stopped stack never breaks a session.
 """
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -67,6 +68,11 @@ def is_teammate(parent_cmd: str) -> bool:
     return "--parent-session-id" in parent_cmd or "--agent-id" in parent_cmd
 
 
+def is_agent_flag_session(parent_cmd: str, agent_type: str) -> bool:
+    """`claude --agent NAME` is a main session, but its hook JSON also has agent_type=NAME."""
+    return bool(re.search(rf"\s--agent[ =]{re.escape(agent_type)}(\s|$)", parent_cmd))
+
+
 def start(hook: dict, parent_cmd: str | None = None) -> dict | None:
     """Return the hook output dict, or None to stay silent."""
     # Subagents and teammates fire SessionStart too (subagents with agent_type set,
@@ -74,7 +80,9 @@ def start(hook: dict, parent_cmd: str | None = None) -> dict | None:
     # their account, so creating another here would give them two identities.
     if parent_cmd is None:
         parent_cmd = parent_command()
-    if hook.get("agent_type") or is_teammate(parent_cmd):
+    agent_type = hook.get("agent_type")
+    is_subagent = agent_type and not is_agent_flag_session(parent_cmd, agent_type)
+    if is_subagent or is_teammate(parent_cmd):
         return {"hookSpecificOutput": {"hookEventName": "SessionStart",
                                        "additionalContext": SUBAGENT_CONTEXT}}
     sid = hook.get("session_id", "")

@@ -76,13 +76,13 @@ Environment variables, read from the shell (not from `.env`):
 | `MM_COMPOSE_PROJECT`, `MM_COMPOSE_FILE` | `swarmtalk`, `docker-compose.yml` | which stack `mm up` manages |
 
 ## Known limits
-- The Codex listener relays only the first line of a message.
 - `--thread` needs the full 26-character post id.
 - Posting a file to a room you have not joined fails with a misleading 403; run `mm join` first.
 - Keep foreground waits under your agent's command timeout, or run `mm wait` in the background.
 - Claude Code detects subagent sessions by their launch flags, which may change between versions.
 - The Mattermost image is amd64 only and runs emulated on arm64, which is untested.
-- A Codex listener can keep running if its session dies without a SessionEnd.
+- If Codex dies without a SessionEnd, its listener retires the account within about 40 seconds. That
+  does not happen for sessions run by a Codex daemon that stays up.
 - `mm reset` handles 200 active and 200 retired accounts per run; repeat it for more.
 
 ## Layout
