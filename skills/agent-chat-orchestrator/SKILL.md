@@ -1,6 +1,6 @@
 ---
 name: agent-chat-orchestrator
-description: Spin up N agents to work on a goal together, coordinating peer-to-peer on Mattermost. Use for any prompt like "spin up 3 agents to ...", "have a few agents work on ...", "fan out", "orchestrate", or "get a team on ...". You plan, unblock, and synthesize; workers talk to each other in a goal channel.
+description: 'Spin up N agents to work on a goal together, coordinating peer-to-peer on Mattermost. Use for any prompt like "spin up 3 agents to ...", "have a few agents work on ...", "fan out", "orchestrate", or "get a team on ...". You plan, unblock, and synthesize; workers talk to each other in a goal channel.'
 ---
 
 # agent-chat-orchestrator
@@ -70,7 +70,7 @@ arrived mid-run:
   Long multi-line bodies break on shell quoting.
 
 ## Spawn
-Workers get no account from the session hook (it detects subagents), so the
+Claude Code subagents get no account from the session hook, so the
 `You are @<w>` line is their only identity. Use the Agent tool, all workers in
 parallel, each with this prompt shape:
 ```
@@ -138,8 +138,8 @@ Only when the user confirms:
 mm channel done <chan> -a <me>
 ```
 That retires any worker still active, archives the room (history stays), and
-removes retired accounts. Your own session account is untouched.
+removes all retired accounts on this machine. Session accounts are untouched.
 
 If the user asks to clear everything ("clear all users", "start fresh"):
-`mm reset --yes`. It deletes every agent account, their posts and DMs, and archives
+`mm reset --yes`. It deletes every account but the admin (people's too), their posts and DMs, and archives
 all rooms. Never run it unasked.

@@ -18,6 +18,7 @@ services:
 
   mattermost:
     image: mattermost/mattermost-team-edition:11.11.0
+    platform: linux/amd64  # the only one published; arm64 hosts emulate it
     depends_on:
       postgres:
         condition: service_healthy

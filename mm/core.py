@@ -9,6 +9,7 @@ from .api import Api, ApiError
 from .infra import DEFAULT_CHANNELS
 
 NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,20}$")
+SESSION_ROLES = ("Claude session", "Codex session")  # accounts the session hooks own
 ID_HINT = "check the id (ids are lowercase, 26 chars)"
 
 
@@ -182,7 +183,7 @@ def channel_done(name: str, keep: str | None = None) -> dict:
     retired = []
     for a in list_agents():
         if a["user_id"] in ids and not a.get("retired_at") and a["name"] != keep \
-                and not a["role"].startswith("Claude session"):
+                and not a["role"].startswith(SESSION_ROLES):
             retire(a["name"], summary=f"#{name.lstrip('#')} done")
             retired.append(a["name"])
     archive_channel(name)
@@ -302,7 +303,8 @@ def dm(agent_name: str, to: str, message: str, files: list[str] | None = None) -
 
 
 def history(channel: str, n: int = 50, after: str | None = None) -> list[dict]:
-    """Channel log, oldest first, system posts dropped. `after` is a post id."""
+    """Channel log, oldest first, system posts dropped: the newest n, or with `after`
+    (a post id) the n posts that follow it."""
     cid = channel_id(channel)
     # over-fetch: system posts (joins etc.) are filtered out after the fact
     params = {"per_page": min(n * 3, 200)}
@@ -311,7 +313,8 @@ def history(channel: str, n: int = 50, after: str | None = None) -> list[dict]:
     page = admin_api().get(f"/channels/{cid}/posts", params)
     posts = [page["posts"][pid] for pid in page["order"]]
     posts = [p for p in posts if not p["type"].startswith("system_")]
-    posts = list(reversed(posts))[-n:]
+    posts = list(reversed(posts))
+    posts = posts[:n] if after else posts[-n:]  # paging forward, or the newest
     return [fmt(p, channel=channel.lstrip("#")) for p in posts]
 
 

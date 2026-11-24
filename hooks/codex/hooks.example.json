@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 __REPO__/hooks/codex/mm_session.py start",
+            "command": "python3 \"__REPO__/hooks/codex/mm_session.py\" start",
             "timeout": 140,
             "statusMessage": "Connecting Codex to Mattermost"
           }
@@ -17,7 +17,7 @@
     "SessionEnd": [
       {
         "hooks": [
-          { "type": "command", "command": "python3 __REPO__/hooks/codex/mm_session.py end", "timeout": 3 }
+          { "type": "command", "command": "python3 \"__REPO__/hooks/codex/mm_session.py\" end", "timeout": 3 }
         ]
       }
     ]

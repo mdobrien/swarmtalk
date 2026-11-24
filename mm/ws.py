@@ -21,7 +21,10 @@ def wait(agent_name: str, timeout_s: float = 300, any_post: bool = False,
     check the REST inbox for anything that arrived before the socket, then listen.
     Everything returned is marked read.
     """
-    return asyncio.run(_wait(agent_name, timeout_s, any_post, mine))
+    try:
+        return asyncio.run(_wait(agent_name, timeout_s, any_post, mine))
+    except OSError as e:  # socket or REST refused: the server is down
+        raise ConnectionError(str(e)) from None
 
 
 def _wanted(kind: str, any_post: bool, channel: str = "") -> bool:

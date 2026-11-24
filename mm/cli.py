@@ -3,6 +3,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
+from urllib.error import URLError
 
 from . import core, infra, session, ws
 from .api import BASE_URL, ApiError
@@ -49,7 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     ch = sub.add_parser("channel", help="channels").add_subparsers(dest="sub", required=True)
     cn = ch.add_parser("new", help="create (or get) a public channel")
-    cn.add_argument("name")
+    cn.add_argument("name", help="lowercase letters, digits, - and _; starts with a letter; 21 chars at most")
     cn.add_argument("--purpose", default="")
     cn.add_argument("--unique", action="store_true", help="append -<hex>: a fresh room per group")
     ca = ch.add_parser("archive", help="archive a finished group's channel (history stays)")
@@ -61,11 +62,11 @@ def build_parser() -> argparse.ArgumentParser:
     se = sub.add_parser("session", help="Claude Code hook entrypoints (stdin: hook JSON)")
     se.add_argument("sub", choices=["start", "end"])
 
-    rs = sub.add_parser("reset", help="wipe ALL agents, their posts and DMs; archive all rooms")
+    rs = sub.add_parser("reset", help="delete every account but the admin (people too), with their posts and DMs; archive all rooms")
     rs.add_argument("--yes", action="store_true", help="required; this deletes history")
 
     cu = sub.add_parser("cleanup", help="remove retired accounts from the team and local state")
-    cu.add_argument("--all", action="store_true", help="retire active accounts too")
+    cu.add_argument("--all", action="store_true", help="retire ALL active accounts on this machine too, live sessions included")
     cu.add_argument("--purge", action="store_true", help="delete users permanently (drops their posts)")
 
     j = sub.add_parser("join", help="join a channel")
@@ -112,7 +113,7 @@ def build_parser() -> argparse.ArgumentParser:
     h = sub.add_parser("history", help="channel log, oldest first")
     h.add_argument("-c", "--channel", required=True)
     h.add_argument("-n", type=int, default=50)
-    h.add_argument("--after", help="post id; only newer posts")
+    h.add_argument("--after", help="post id; the next N posts after it")
 
     wt = sub.add_parser("wait", help="block until a room post, DM or @mention arrives (push)")
     _agent_arg(wt)
@@ -160,7 +161,10 @@ def main(argv=None) -> int:
             e.path.startswith(("/posts/", "/files/")) else ""
         print(f"error: {e}{hint}", file=sys.stderr)
         return 1
-    except RuntimeError as e:  # unknown/retired agent, dead socket, bad input
+    except (URLError, ConnectionError):
+        print(f"error: Mattermost not reachable at {BASE_URL} (run `mm up`)", file=sys.stderr)
+        return 1
+    except (RuntimeError, ValueError) as e:  # unknown/retired agent, dead socket, bad input
         print(f"error: {e}", file=sys.stderr)
         return 1
 
@@ -211,7 +215,7 @@ def _run(argv=None) -> int:
         return session.main(args.sub)
     elif c == "reset":
         if not args.yes:
-            sys.exit("refusing: `mm reset --yes` deletes every agent account and their posts")
+            sys.exit("refusing: `mm reset --yes` deletes every account but the admin, and their posts")
         r = core.reset()
         print(f"deleted {len(r['deleted_users'])} users, archived {len(r['archived'])} rooms")
     elif c == "cleanup":

@@ -2,13 +2,13 @@
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup|resume",
-        "hooks": [{ "type": "command", "command": "__MM__ session start", "timeout": 15 }]
+        "matcher": "startup|resume|clear",
+        "hooks": [{ "type": "command", "command": "\"__MM__\" session start", "timeout": 15 }]
       }
     ],
     "SessionEnd": [
       {
-        "hooks": [{ "type": "command", "command": "__MM__ session end", "timeout": 15 }]
+        "hooks": [{ "type": "command", "command": "\"__MM__\" session end", "timeout": 15 }]
       }
     ]
   }

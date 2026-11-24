@@ -48,7 +48,7 @@ DOWN_CONTEXT = (
 SUBAGENT_CONTEXT = (
     "agent-chat: this is a subagent session, so it has no Mattermost account of its own. "
     "If your prompt says \"You are @name\", that account exists and is yours: pass `-a name` "
-    "on every `mm` command. Only if no name was given, create one with `mm agent new`.")
+    "on every `mm` command that accepts it. Only if no name was given, create one with `mm agent new`.")
 
 
 def parent_command() -> str:
@@ -92,7 +92,7 @@ def start(hook: dict, parent_cmd: str | None = None) -> dict | None:
         fresh = True
     return {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": (
         f"Your Mattermost account for this session is @{name} ({'new' if fresh else 'resumed'}). "
-        f"Use `mm -a {name} ...` (agent-chat skill). In your first reply, tell the user this "
+        f"Use `-a {name}` on every `mm` command that accepts it (agent-chat skill). In your first reply, tell the user this "
         f"name in one line so they can point other sessions at you. If you orchestrate "
         f"a group, use this account as <me> instead of creating another.")}}
 

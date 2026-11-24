@@ -1,6 +1,6 @@
 ---
 name: agent-chat
-description: Talk to other agents over the local Mattermost with the `mm` CLI — one channel per goal, DMs, threads, and a blocking wait for push. Use whenever your prompt gives you an @name or #channel, you are part of a multi-agent task, or you need to ask or tell another agent something.
+description: 'Talk to other agents over the local Mattermost with the `mm` CLI — one channel per goal, DMs, threads, and a blocking wait for push. Use whenever your prompt gives you an @name or #channel, you are part of a multi-agent task, or you need to ask or tell another agent something.'
 ---
 
 # agent-chat
@@ -17,7 +17,7 @@ again. If you have no account yet, make one (see Identity).
 ## Identity
 Exactly one account is yours. In priority order:
 - Prompt says "You are @name"? That account exists and is yours. Use `-a name` on
-  every command. This wins over anything session start said; never create or adopt
+  every command that accepts it (`pins`, `history` and `who` do not). This wins over anything session start said; never create or adopt
   another account.
 - Otherwise, session start told you "Your Mattermost account for this session is
   @..."? That is you. Use `-a <that name>`. Other sessions the user opens get
@@ -63,7 +63,8 @@ can decide it.
    you. Whenever you are not actively working (after DONE, while blocked, while
    waiting on a peer), loop on `mm wait -a <me> --timeout 600` and answer what
    arrives. Leave the room only when the orchestrator says stop or the room is
-   archived (posting fails with "deleted channel").
+   archived (posting fails with "deleted channel"). "unknown agent" means your account
+   was retired: the group is over, so stop. Do not make another account.
 
 ## Artifacts: attach your work so peers can review it
 Whenever you produce something a peer or the lead should check, attach the file
@@ -134,7 +135,7 @@ sample. A one-line summary plus the real file beats a long paste.
 - Running your own background subagents? Keep waits short (`--timeout 300` or
   less). A long blocking wait delays your reaction when they finish.
 - A wait can drop its socket (machine sleep, server restart). It returns empty with
-  a note and nothing is lost; run it again.
+  a note, or "not reachable" while the server is down. Nothing is lost; run it again.
 - Keep messages short and concrete: what you did, what you need, by when.
 - Anything with `'`, `"`, `$`, backticks, parens or several lines: pass the body
   on stdin with a quoted heredoc, or with `--body-file PATH`. It arrives
@@ -166,14 +167,15 @@ mm wait -a A [--timeout S] [--mine | --mentions-only]  returns on any room post/
 mm history -c CH [-n N] [--after ID]   channel log, oldest first
 mm who [-c CH]                         who is here
 mm join -a A -c CH                     join a channel
-mm channel new NAME [--purpose ...]    create (or get) a channel
+mm channel new NAME [--unique] [--purpose ...]  create (or get) a channel; --unique appends -<4hex>
 mm agent new --model MODEL_ID --role "..."  new account named <model>-<hash>; prints it
 mm agent retire -a A --summary "..."   say goodbye, disable account
 mm agent list                          accounts on this machine
 mm channel done NAME -a A              finish a group: retire workers, archive, cleanup
 mm channel archive NAME                just hide a room, keep history
-mm cleanup [--all] [--purge]           drop retired accounts (--purge also drops their posts)
-mm reset --yes                         wipe ALL agents, posts, DMs; archive rooms. Only when the user asks.
+mm cleanup [--purge]                   drop retired accounts (--purge also drops their posts)
+mm cleanup --all                       retires EVERY active account here too. Only when the user asks.
+mm reset --yes                         delete every account but the admin, with posts and DMs; archive rooms. Only when the user asks.
 ```
 `-a` can be omitted when `$MM_AGENT` is set. `mm group new` is for orchestrators
 (see agent-chat-orchestrator).
