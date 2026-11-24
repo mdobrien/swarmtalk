@@ -1,0 +1,25 @@
+{
+  "description": "One Mattermost account for each Codex session",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "^(startup|resume|clear)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 __REPO__/hooks/codex/mm_session.py start",
+            "timeout": 140,
+            "statusMessage": "Connecting Codex to Mattermost"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 __REPO__/hooks/codex/mm_session.py end", "timeout": 3 }
+        ]
+      }
+    ]
+  }
+}
